@@ -1,0 +1,113 @@
+@startuml c4-container-online-deposits-mvp
+!define RELATIVE_INCLUDE
+!include ./C4-lib/C4_Container.puml
+
+LAYOUT_LEFT_RIGHT()
+hide stereotype
+legend right
+|<color:$LEGEND_TITLE_COLOR>**Legend**</color> |
+|<$PERSON_BG_COLOR> person |
+|<$CONTAINER_BG_COLOR> container / database |
+|<$EXTERNAL_SYSTEM_BG_COLOR> external system |
+endlegend
+
+title Банк "Стандарт" - C4 Container: MVP открытия депозитов онлайн
+
+Person(existing_client, "Действующий клиент", "Подаёт заявку в интернет-банке.")
+Person(new_client, "Новый клиент", "Подаёт заявку на сайте и проходит идентификацию в отделении.")
+Person(front_office, "Сотрудник фронт-офиса", "Идентифицирует нового клиента и оформляет документы.")
+Person(call_center_manager, "Менеджер кол-центра", "Звонит новому клиенту и фиксирует результат.")
+
+Boundary(back_office, "Бэк-офис банка") {
+  Person(deposit_back_office, "Сотрудник бэк-офиса депозитов", "Проверяет заявку и подтверждает условия депозита.")
+  Person(credit_back_office, "Сотрудник бэк-офиса кредитов", "Работает со ставками и риск-данными.")
+}
+
+System_Boundary(channels, "Клиентские каналы") {
+  Container(site, "Сайт", "PHP + React.js", "Показывает депозиты и принимает заявку нового клиента.")
+
+  Container_Boundary(internet_bank, "Интернет-банк") {
+    Container(ib_ui, "Web UI интернет-банка", "ASP.NET MVC", "Показывает депозиты, ставки и форму заявки.")
+    Container(ib_backend, "Backend интернет-банка", "ASP.NET MVC / .NET", "Обрабатывает операции клиента и интеграцию с MVP-контуром.")
+    ContainerDb(ib_db, "БД интернет-банка", "MS SQL", "Данные интернет-банка и состояние пользовательских сессий.")
+  }
+}
+
+System_Boundary(mvp, "Контур онлайн-открытия депозитов MVP") {
+  Container(deposit_api, "API депозитных заявок", "Java / Spring Boot", "Принимает заявки с сайта и интернет-банка по защищённому каналу.")
+  Container(application_service, "Сервис обработки заявок", "Java / Spring Boot", "Хранит статусы, координирует обработку и обмен с АБС.")
+  Container(rates_service, "Сервис ставок", "Java / Spring Boot", "Предоставляет актуальные и персонализированные ставки каналам.")
+  Container(sms_adapter, "SMS-адаптер", "Java / Spring Boot", "Запрашивает СМС-коды подтверждения и отправляет уведомления через существующий шлюз.")
+  ContainerDb(application_db, "БД заявок", "MS SQL", "Заявки, статусы, результаты звонков и технические идентификаторы.")
+}
+
+System_Boundary(existing_systems, "Существующие системы банка") {
+  Container(call_center_system, "Система кол-центра", "React + Java Spring Boot", "Позволяет менеджеру видеть заявку и фиксировать результат звонка.")
+  Container(sms_gateway, "SMS-шлюз", "Существующий компонент", "Отправляет СМС-коды и уведомления клиентам.")
+
+  Container_Boundary(abs, "АБС") {
+    Container(abs_ui, "АРМ сотрудников", "Delphi", "Рабочее место фронт-офиса, бэк-офиса депозитов и кредитного бэк-офиса.")
+    Container(abs_deposit_module, "Модуль депозитов и договоров", "Delphi / PL-SQL", "Создание депозитов, договоров и загрузка подписанных документов.")
+    Container(abs_rate_module, "Модуль ставок и согласования", "PL-SQL", "Ведение ставок, риск-данных и подтверждение условий заявки.")
+    Container(abs_integration_api, "Интеграционный интерфейс АБС", "PL-SQL / API", "Контролируемый обмен заявками, статусами и условиями с MVP-контуром.")
+    ContainerDb(abs_db, "БД АБС", "Oracle", "Системный источник данных по депозитам, договорам, ставкам и условиям.")
+  }
+}
+
+System_Ext(telecom_operator, "Телеком-оператор", "Доставляет СМС клиентам.")
+
+Rel_D(new_client, site, "подаёт заявку", "HTTPS")
+Rel_D(existing_client, ib_ui, "подаёт заявку", "HTTPS")
+Rel_D(new_client, front_office, "очная идентификация")
+
+Rel_R(ib_ui, ib_backend, "операции клиента")
+Rel_D(ib_backend, ib_db, "читает / пишет")
+Rel_R(site, deposit_api, "заявка нового клиента", "HTTPS/API")
+Rel_R(ib_backend, deposit_api, "заявка действующего клиента", "HTTPS/API")
+Rel_D(deposit_api, application_service, "передаёт заявку")
+Rel_D(application_service, application_db, "хранит статус")
+
+Rel_U(site, rates_service, "получает актуальные ставки", "HTTPS/API")
+Rel_U(ib_backend, rates_service, "получает актуальные и персональные ставки", "HTTPS/API")
+
+Rel_R(application_service, call_center_system, "заявка с сайта / результат звонка", "API")
+Rel_D(call_center_manager, call_center_system, "обрабатывает звонок")
+
+BiRel_R(application_service, abs_integration_api, "заявки / статусы / условия", "API")
+Rel_D(abs_integration_api, abs_deposit_module, "передаёт заявку")
+Rel_D(abs_integration_api, abs_rate_module, "получает условия")
+Rel_D(abs_deposit_module, abs_db, "читает / пишет")
+Rel_D(abs_rate_module, abs_db, "читает / пишет")
+Rel_U(rates_service, abs_integration_api, "получает ставки", "API")
+
+Rel_D(front_office, abs_ui, "оформляет договоры и документы")
+Rel_D(deposit_back_office, abs_ui, "подтверждает условия")
+Rel_D(deposit_back_office, application_service, "проверяет заявку")
+Rel_D(credit_back_office, abs_ui, "работает со ставками и риск-данными")
+Rel_D(abs_ui, abs_deposit_module, "операции с депозитами")
+Rel_D(abs_ui, abs_rate_module, "ставки / риск-данные")
+
+Rel_R(application_service, sms_adapter, "СМС-коды подтверждения / уведомления")
+Rel_R(sms_adapter, sms_gateway, "запрос отправки СМС")
+Rel_D(sms_gateway, telecom_operator, "передача СМС оператору")
+Rel_U(telecom_operator, existing_client, "доставляет СМС")
+Rel_U(telecom_operator, new_client, "доставляет СМС")
+
+Lay_D(existing_client, ib_ui)
+Lay_D(new_client, site)
+Lay_R(ib_ui, site)
+Lay_D(ib_ui, ib_backend)
+Lay_D(ib_backend, ib_db)
+Lay_R(site, deposit_api)
+Lay_R(deposit_api, application_service)
+Lay_D(application_service, application_db)
+Lay_U(rates_service, site)
+Lay_D(call_center_system, sms_gateway)
+Lay_R(application_service, abs_integration_api)
+Lay_D(abs_integration_api, abs_rate_module)
+Lay_D(abs_rate_module, abs_db)
+Lay_R(abs_ui, abs_deposit_module)
+Lay_D(deposit_back_office, application_service)
+Lay_R(deposit_back_office, credit_back_office)
+
+@enduml
