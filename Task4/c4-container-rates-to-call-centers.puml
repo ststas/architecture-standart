@@ -1,0 +1,63 @@
+@startuml c4-container-rates-to-call-centers
+!define RELATIVE_INCLUDE
+!include ./C4-lib/C4_Container.puml
+
+LAYOUT_LEFT_RIGHT()
+hide stereotype
+legend right
+|<color:$LEGEND_TITLE_COLOR>**Legend**</color> |
+|<$PERSON_BG_COLOR> person |
+|<$EXTERNAL_PERSON_BG_COLOR> external person |
+|<$CONTAINER_BG_COLOR> container / database |
+|<$EXTERNAL_SYSTEM_BG_COLOR> external system |
+endlegend
+
+title Банк "Стандарт" - C4 Container: передача ставок в кол-центры
+
+Person(bank_call_center_operator, "Оператор кол-центра банка", "Консультирует клиентов по актуальным депозитным ставкам.")
+Person(bank_employee, "Ответственный сотрудник банка", "Контролирует рассылку и может инициировать повторную отправку файла.")
+Person_Ext(partner_call_center_operator, "Оператор партнёрского кол-центра", "Консультирует клиента по депозитным ставкам на основе полученного файла ставок.")
+
+System_Boundary(rate_source, "Источник ставок") {
+  Container(abs_rate_module, "Модуль ставок АБС", "PL-SQL / Oracle", "Системный источник базовых депозитных ставок и периода их действия.")
+}
+
+System_Boundary(rate_publication, "Сервис ставок и файловый экспорт") {
+  Container(rates_api, "API ставок", "Java / Spring Boot", "Отдаёт актуальные базовые ставки внутренним потребителям.")
+  Container(file_generator, "Генератор файла ставок", "Java / Spring Boot", "Формирует XLSX/CSV-файл с актуальными базовыми ставками.")
+  Container(mail_scheduler, "Планировщик и e-mail-рассылка", "Java / Spring Boot", "Запускает регламентную/повторную отправку файла партнёру.")
+  ContainerDb(dispatch_log, "Журнал отправок", "MS SQL", "Хранит статусы формирования и отправки файла, ошибки и время рассылки.")
+}
+
+System_Boundary(bank_call_center, "Система кол-центра банка") {
+  Container(rates_screen, "Экран ставок", "React", "Показывает оператору кол-центра актуальные депозитные ставки.")
+}
+
+System(mail_service, "Почтовый сервис банка", "Отправляет e-mail с файлом ставок на общий адрес партнёра.")
+System_Ext(partner_call_center, "Партнёрский кол-центр", "Получает файл ставок на общий e-mail и консультирует клиентов.")
+
+Rel_D(bank_call_center_operator, rates_screen, "смотрит ставки")
+Rel_R(rates_screen, rates_api, "получает ставки", "внутренний API")
+Rel_R(rates_api, abs_rate_module, "читает актуальные ставки")
+
+Rel_D(mail_scheduler, file_generator, "запускает формирование файла")
+Rel_D(bank_employee, mail_scheduler, "инициирует повторную отправку")
+Rel_R(file_generator, rates_api, "получает базовые ставки")
+Rel_R(mail_scheduler, mail_service, "отправляет e-mail с файлом ставок")
+Rel_D(mail_scheduler, dispatch_log, "пишет статус отправки")
+Rel_D(file_generator, dispatch_log, "пишет статус формирования")
+
+Rel_D(mail_service, partner_call_center, "передаёт файл ставок по e-mail")
+Rel_D(partner_call_center_operator, partner_call_center, "использует файл ставок для консультации")
+
+Lay_R(abs_rate_module, rates_api)
+Lay_D(rates_api, file_generator)
+Lay_D(file_generator, mail_scheduler)
+Lay_D(bank_employee, mail_scheduler)
+Lay_R(mail_scheduler, mail_service)
+Lay_R(mail_service, partner_call_center)
+Lay_D(rates_api, rates_screen)
+Lay_R(bank_call_center_operator, rates_screen)
+Lay_R(partner_call_center_operator, partner_call_center)
+
+@enduml
