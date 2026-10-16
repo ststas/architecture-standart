@@ -1,0 +1,50 @@
+@startuml c4-context-rates-to-call-centers
+!define RELATIVE_INCLUDE
+!include ./C4-lib/C4_Context.puml
+
+LAYOUT_LEFT_RIGHT()
+hide stereotype
+legend right
+|<color:$LEGEND_TITLE_COLOR>**Legend**</color> |
+|<$PERSON_BG_COLOR> person |
+|<$EXTERNAL_PERSON_BG_COLOR> external person |
+|<$SYSTEM_BG_COLOR> system |
+|<$EXTERNAL_SYSTEM_BG_COLOR> external system |
+endlegend
+
+title Банк "Стандарт" - C4 Context: передача ставок в кол-центры
+
+Person(bank_call_center_operator, "Оператор кол-центра банка", "Консультирует клиентов по актуальным депозитным ставкам.")
+Person_Ext(partner_call_center_operator, "Оператор партнёрского кол-центра", "Консультирует клиента по депозитным ставкам на основе полученного файла ставок.")
+Person(bank_employee, "Ответственный сотрудник банка", "Контролирует рассылку и может инициировать повторную отправку файла.")
+
+Enterprise_Boundary(bank, "Банк Стандарт") {
+  System(abs_rates, "АБС / модуль ставок", "Системный источник депозитных ставок и периода их действия.")
+  System(rates_service, "Сервис ставок", "Предоставляет актуальные базовые ставки внутренним системам и файловому экспорту.")
+  System(call_center_system, "Система кол-центра банка", "Показывает оператору актуальные ставки в рабочем интерфейсе.")
+  System(file_export_service, "Сервис файлового экспорта ставок", "Формирует файл ставок для партнёрского кол-центра.")
+  System(mail_service, "Почтовый сервис банка", "Отправляет файл ставок на согласованный адрес партнёра.")
+}
+
+System_Ext(partner_call_center, "Партнёрский кол-центр", "Получает файл ставок на общий e-mail и консультирует клиентов.")
+
+Rel_D(bank_call_center_operator, call_center_system, "смотрит ставки")
+Rel_R(call_center_system, rates_service, "получает актуальные ставки", "внутренний API")
+Rel_R(rates_service, abs_rates, "получает ставки из системного источника")
+
+Rel_D(file_export_service, rates_service, "получает базовые ставки")
+Rel_D(file_export_service, mail_service, "передаёт файл ставок для отправки")
+Rel_D(partner_call_center_operator, partner_call_center, "использует файл ставок для консультации")
+Rel_R(mail_service, partner_call_center, "отправляет e-mail с файлом ставок")
+
+Rel_D(bank_employee, file_export_service, "контролирует рассылку / повторная отправка")
+
+Lay_R(abs_rates, rates_service)
+Lay_R(rates_service, call_center_system)
+Lay_D(rates_service, file_export_service)
+Lay_R(file_export_service, mail_service)
+Lay_R(mail_service, partner_call_center)
+Lay_D(bank_call_center_operator, call_center_system)
+Lay_D(partner_call_center_operator, partner_call_center)
+
+@enduml

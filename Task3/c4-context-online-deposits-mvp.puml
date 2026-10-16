@@ -1,0 +1,73 @@
+@startuml c4-context-online-deposits-mvp
+!define RELATIVE_INCLUDE
+!include ./C4-lib/C4_Context.puml
+
+LAYOUT_TOP_DOWN()
+hide stereotype
+legend right
+|<color:$LEGEND_TITLE_COLOR>**Legend**</color> |
+|<$PERSON_BG_COLOR> person |
+|<$SYSTEM_BG_COLOR> system |
+|<$EXTERNAL_SYSTEM_BG_COLOR> external system |
+endlegend
+
+title Банк "Стандарт" — C4 Context: MVP открытия депозитов онлайн
+
+Person(existing_client, "Действующий клиент", "Подаёт заявку в интернет-банке.")
+Person(new_client, "Новый клиент", "Подаёт заявку на сайте и проходит идентификацию в отделении.")
+Person(front_office, "Сотрудник фронт-офиса", "Идентифицирует нового клиента и оформляет документы.")
+Person(call_center_manager, "Менеджер кол-центра", "Звонит новому клиенту и фиксирует результат.")
+
+System_Boundary(mvp, "Контур онлайн-открытия депозитов MVP") {
+  System(deposit_mvp, "Контур обработки депозитных заявок", "Принимает заявки, хранит статусы и координирует обработку.")
+}
+
+Enterprise_Boundary(bank_systems, "Существующие системы банка") {
+  System(internet_bank, "Интернет-банк", "Канал для действующих клиентов.")
+  System(site, "Сайт", "Канал для новых клиентов.")
+  System(call_center_system, "Система кол-центра", "Работа менеджера с заявками и результатами звонков.")
+  System(abs, "АБС", "Учёт депозитов, договоров, ставок и подтверждение условий.")
+  System(sms_gateway, "SMS-шлюз", "СМС-коды и уведомления.")
+}
+
+Boundary(back_office, "Бэк-офис банка") {
+  Person(deposit_back_office, "Сотрудник бэк-офиса депозитов", "Проверяет заявку и подтверждает условия депозита.")
+  Person(credit_back_office, "Сотрудник бэк-офиса кредитов", "Работает со ставками и риск-данными.")
+}
+
+System_Ext(telecom_operator, "Телеком-оператор", "Доставка СМС клиентам.")
+
+Rel_D(new_client, site, "заявка на депозит", "HTTPS")
+Rel_D(existing_client, internet_bank, "заявка на депозит", "HTTPS")
+Rel_D(new_client, front_office, "очная идентификация")
+
+Rel_D(site, deposit_mvp, "заявки / ставки", "API")
+Rel_D(internet_bank, deposit_mvp, "заявки / ставки / статусы", "API")
+
+BiRel_D(call_center_system, deposit_mvp, "заявка с сайта / результат звонка")
+Rel_D(call_center_manager, call_center_system, "обработка звонка")
+
+Rel_U(deposit_back_office, deposit_mvp, "обработка заявки")
+Rel_U(deposit_back_office, abs, "подтверждение условий")
+Rel_U(credit_back_office, abs, "ставки / риск-данные")
+Rel_D(front_office, abs, "договоры / документы")
+
+BiRel_D(deposit_mvp, abs, "заявки / статусы / условия")
+Rel_R(deposit_mvp, sms_gateway, "СМС-коды / уведомления")
+Rel_D(sms_gateway, telecom_operator, "доставка СМС клиентам")
+
+Lay_R(existing_client, new_client)
+Lay_R(internet_bank, site)
+Lay_R(site, call_center_system)
+Lay_R(call_center_system, abs)
+Lay_R(abs, sms_gateway)
+Lay_D(site, deposit_mvp)
+Lay_D(internet_bank, deposit_mvp)
+Lay_D(call_center_system, deposit_mvp)
+Lay_D(deposit_mvp, abs)
+Lay_D(deposit_mvp, deposit_back_office)
+Lay_R(deposit_back_office, credit_back_office)
+
+deposit_mvp -[hidden]down- back_office
+
+@enduml
